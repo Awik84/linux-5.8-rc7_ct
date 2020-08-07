@@ -1,0 +1,76 @@
+--- drivers/net/ethernet/mellanox/mlx5/core/en/tc_ct.h
++++ drivers/net/ethernet/mellanox/mlx5/core/en/tc_ct.h
+@@ -16,6 +16,8 @@
+ struct mlx5e_tc_flow;
+ struct mlx5e_priv;
+ 
++struct mlx5_chains_priv;
++struct mlx5_tc_ct_priv;
+ struct mlx5_ct_flow;
+ 
+ struct nf_flowtable;
+@@ -75,16 +77,27 @@
+ 				 misc_parameters_2.metadata_reg_c_1) + 3,\
+ }
+ 
++#define nic_zone_restore_to_reg_ct {\
++	.mfield = MLX5_ACTION_IN_FIELD_METADATA_REG_B,\
++	.moffset = 2,\
++	.mlen = 1,\
++}
++
+ #define REG_MAPPING_MLEN(reg) (mlx5e_tc_attr_to_reg_mappings[reg].mlen)
++#define REG_MAPPING_MOFFSET(reg) (mlx5e_tc_attr_to_reg_mappings[reg].moffset)
++#define REG_MAPPING_SHIFT(reg) (REG_MAPPING_MOFFSET(reg) * 8)
+ #define ZONE_RESTORE_BITS (REG_MAPPING_MLEN(ZONE_RESTORE_TO_REG) * 8)
+ #define ZONE_RESTORE_MAX GENMASK(ZONE_RESTORE_BITS - 1, 0)
+ 
+ #if IS_ENABLED(CONFIG_MLX5_TC_CT)
+ 
+ int
+-mlx5_tc_ct_init(struct mlx5_rep_uplink_priv *uplink_priv);
++mlx5_tc_ct_init(struct mlx5e_priv *priv,
++		struct mlx5_chains_priv *chains,
++		struct mlx5_tc_ct_priv **_ct_priv);
+ void
+-mlx5_tc_ct_clean(struct mlx5_rep_uplink_priv *uplink_priv);
++mlx5_tc_ct_clean(struct mlx5_tc_ct_priv **_ct_priv,
++		 struct mlx5_chains_priv *chains);
+ 
+ int
+ mlx5_tc_ct_parse_match(struct mlx5e_priv *priv,
+@@ -113,19 +126,22 @@
+ 		       struct mlx5_flow_attr *attr);
+ 
+ bool
+-mlx5e_tc_ct_restore_flow(struct mlx5_rep_uplink_priv *uplink_priv,
++mlx5e_tc_ct_restore_flow(struct mlx5_tc_ct_priv *ct_priv,
+ 			 struct sk_buff *skb, u8 zone_restore_id);
+ 
+ #else /* CONFIG_MLX5_TC_CT */
+ 
+ static inline int
+-mlx5_tc_ct_init(struct mlx5_rep_uplink_priv *uplink_priv)
++mlx5_tc_ct_init(struct mlx5e_priv *priv,
++		struct mlx5_chains_priv *chains,
++		struct mlx5_tc_ct_priv **_ct_priv)
+ {
+ 	return 0;
+ }
+ 
+ static inline void
+-mlx5_tc_ct_clean(struct mlx5_rep_uplink_priv *uplink_priv)
++mlx5_tc_ct_clean(struct mlx5_tc_ct_priv **_ct_priv,
++		 struct mlx5_chains_priv *chains)
+ {
+ }
+ 
+@@ -182,7 +198,7 @@
+ }
+ 
+ static inline bool
+-mlx5e_tc_ct_restore_flow(struct mlx5_rep_uplink_priv *uplink_priv,
++mlx5e_tc_ct_restore_flow(struct mlx5_tc_ct_priv *ct_priv,
+ 			 struct sk_buff *skb, u8 zone_restore_id)
+ {
+ 	if (!zone_restore_id)

@@ -1,0 +1,42 @@
+--- drivers/net/ethernet/mellanox/mlx5/core/en_rep.c
++++ drivers/net/ethernet/mellanox/mlx5/core/en_rep.c
+@@ -763,12 +763,12 @@
+ 		 *
+ 		 * We only support chain 0 of FT offload.
+ 		 */
+-		if (!mlx5_esw_chains_prios_supported(esw) ||
+-		    tmp.common.prio >= mlx5_esw_chains_get_prio_range(esw) ||
++		if (!mlx5_chains_prios_supported(esw_chains(esw)) ||
++		    tmp.common.prio >= mlx5_chains_get_prio_range(esw_chains(esw)) ||
+ 		    tmp.common.chain_index)
+ 			return -EOPNOTSUPP;
+ 
+-		tmp.common.chain_index = mlx5_esw_chains_get_ft_chain(esw);
++		tmp.common.chain_index = mlx5_chains_get_nf_ft_chain(esw_chains(esw));
+ 		tmp.common.prio++;
+ 		err = mlx5e_rep_indr_offload(priv->netdev, &tmp, priv, flags);
+ 		memcpy(&f->stats, &tmp.stats, sizeof(f->stats));
+@@ -1295,7 +1295,7 @@
+ 	case TC_SETUP_CLSFLOWER:
+ 		memcpy(&tmp, f, sizeof(*f));
+ 
+-		if (!mlx5_esw_chains_prios_supported(esw))
++		if (!mlx5_chains_prios_supported(esw_chains(esw)))
+ 			return -EOPNOTSUPP;
+ 
+ 		/* Re-use tc offload path by moving the ft flow to the
+@@ -1307,12 +1307,12 @@
+ 		 *
+ 		 * We only support chain 0 of FT offload.
+ 		 */
+-		if (tmp.common.prio >= mlx5_esw_chains_get_prio_range(esw))
++		if (tmp.common.prio >= mlx5_chains_get_prio_range(esw_chains(esw)))
+ 			return -EOPNOTSUPP;
+ 		if (tmp.common.chain_index != 0)
+ 			return -EOPNOTSUPP;
+ 
+-		tmp.common.chain_index = mlx5_esw_chains_get_ft_chain(esw);
++		tmp.common.chain_index = mlx5_chains_get_nf_ft_chain(esw_chains(esw));
+ 		tmp.common.prio++;
+ 		err = mlx5e_rep_setup_tc_cls_flower(priv, &tmp, flags);
+ 		memcpy(&f->stats, &tmp.stats, sizeof(f->stats));

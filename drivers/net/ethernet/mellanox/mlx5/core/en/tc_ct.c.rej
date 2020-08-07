@@ -1,0 +1,133 @@
+--- drivers/net/ethernet/mellanox/mlx5/core/en/tc_ct.c
++++ drivers/net/ethernet/mellanox/mlx5/core/en/tc_ct.c
+@@ -1766,42 +1754,72 @@
+ 	return 0;
+ }
+ 
++static int
++mlx5_tc_ct_init_check_nic_support(struct mlx5e_priv *priv,
++				  const char **err_msg)
++{
++	if (!MLX5_CAP_FLOWTABLE_NIC_RX(priv->mdev, ignore_flow_level)) {
++		*err_msg = "firmware level support is missing";
++		return -EOPNOTSUPP;
++	}
++
++	return 0;
++}
++
++static int
++mlx5_tc_ct_init_check_support(struct mlx5e_priv *priv,
++			      enum mlx5_flow_namespace_type ns_type,
++			      const char **err_msg)
++{
++	struct mlx5_eswitch *esw = priv->mdev->priv.eswitch;
++
++#if !IS_ENABLED(CONFIG_NET_TC_SKB_EXT)
++	/* cannot restore chain ID on HW miss */
++
++	*err_msg = "tc skb extension missing";
++	return -EOPNOTSUPP;
++#endif
++	if (ns_type == MLX5_FLOW_NAMESPACE_FDB)
++		return mlx5_tc_ct_init_check_esw_support(esw, err_msg);
++	else
++		return mlx5_tc_ct_init_check_nic_support(priv, err_msg);
++}
++
+ static void
+-mlx5_tc_ct_init_err(struct mlx5e_rep_priv *rpriv, const char *msg, int err)
++mlx5_tc_ct_init_err(struct mlx5_core_dev *dev, const char *msg, int err)
+ {
+ 	if (msg)
+-		netdev_warn(rpriv->netdev,
+-			    "tc ct offload not supported, %s, err: %d\n",
+-			    msg, err);
++		mlx5_core_warn(dev,
++			       "tc ct offload init failed, %s, err: %d\n",
++			       msg, err);
+ 	else
+-		netdev_warn(rpriv->netdev,
+-			    "tc ct offload not supported, err: %d\n",
+-			    err);
++		mlx5_core_warn(dev,
++			       "tc ct offload init failed, err: %d\n",
++			       err);
+ }
+ 
+-int
+-mlx5_tc_ct_init(struct mlx5_rep_uplink_priv *uplink_priv)
++struct mlx5_tc_ct_priv *
++mlx5_tc_ct_init(struct mlx5e_priv *priv, struct mlx5_fs_chains *chains,
++		struct mod_hdr_tbl *mod_hdr,
++		enum mlx5_flow_namespace_type ns_type)
+ {
+ 	struct mlx5_tc_ct_priv *ct_priv;
+-	struct mlx5e_rep_priv *rpriv;
+-	struct mlx5_eswitch *esw;
+-	struct mlx5e_priv *priv;
+	struct mlx5_core_dev *dev;
+ 	const char *msg;
+ 	int err;
+ 
+-	rpriv = container_of(uplink_priv, struct mlx5e_rep_priv, uplink_priv);
+-	priv = netdev_priv(rpriv->netdev);
+-	esw = priv->mdev->priv.eswitch;
+-
+-	err = mlx5_tc_ct_init_check_support(esw, &msg);
++	dev = priv->mdev;
++	err = mlx5_tc_ct_init_check_support(priv, ns_type, &msg);
+ 	if (err) {
+-		mlx5_tc_ct_init_err(rpriv, msg, err);
++		mlx5_core_warn(dev,
++			       "tc ct offload not supported, %s\n",
++			       msg);
+ 		goto err_support;
+ 	}
+ 
+ 	ct_priv = kzalloc(sizeof(*ct_priv), GFP_KERNEL);
+ 	if (!ct_priv) {
+-		mlx5_tc_ct_init_err(rpriv, NULL, -ENOMEM);
++		mlx5_tc_ct_init_err(dev, NULL, -ENOMEM);
+ 		goto err_alloc;
+ 	}
+ 
+@@ -1811,27 +1829,30 @@
+ 		goto err_mapping;
+ 	}
+ 
+-	ct_priv->esw = esw;
+-	ct_priv->netdev = rpriv->netdev;
+-	ct_priv->ct = mlx5_chains_create_global_table(esw_chains(esw));
++	ct_priv->ns_type = ns_type;
++	ct_priv->chains = chains;
++	ct_priv->esw = priv->mdev->priv.eswitch;
++	ct_priv->netdev = priv->netdev;
++	ct_priv->mod_hdr_tbl = mod_hdr;
++	ct_priv->ct = mlx5_chains_create_global_table(chains);
+ 	if (IS_ERR(ct_priv->ct)) {
+ 		err = PTR_ERR(ct_priv->ct);
+-		mlx5_tc_ct_init_err(rpriv, "failed to create ct table", err);
++		mlx5_tc_ct_init_err(dev, "failed to create ct table", err);
+ 		goto err_ct_tbl;
+ 	}
+ 
+-	ct_priv->ct_nat = mlx5_chains_create_global_table(esw_chains(esw));
++	ct_priv->ct_nat = mlx5_chains_create_global_table(chains);
+ 	if (IS_ERR(ct_priv->ct_nat)) {
+ 		err = PTR_ERR(ct_priv->ct_nat);
+-		mlx5_tc_ct_init_err(rpriv, "failed to create ct nat table",
++		mlx5_tc_ct_init_err(dev, "failed to create ct nat table",
+ 				    err);
+ 		goto err_ct_nat_tbl;
+ 	}
+ 
+-	ct_priv->post_ct = mlx5_chains_create_global_table(esw_chains(esw));
++	ct_priv->post_ct = mlx5_chains_create_global_table(chains);
+ 	if (IS_ERR(ct_priv->post_ct)) {
+ 		err = PTR_ERR(ct_priv->post_ct);
+-		mlx5_tc_ct_init_err(rpriv, "failed to create post ct table",
++		mlx5_tc_ct_init_err(dev, "failed to create post ct table",
+ 				    err);
+ 		goto err_post_ct_tbl;
+ 	}

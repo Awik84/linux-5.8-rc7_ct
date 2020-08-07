@@ -1,0 +1,10 @@
+--- drivers/net/ethernet/mellanox/mlx5/core/en/fs.h
++++ drivers/net/ethernet/mellanox/mlx5/core/en/fs.h
+@@ -26,6 +26,7 @@
+ 	struct netdev_net_notifier	netdevice_nn;
+ 
+ 	struct mlx5_chains_priv        *chains;
++	struct mlx5_tc_ct_priv         *ct_priv;
+ };
+ 
+ struct mlx5e_flow_table {
