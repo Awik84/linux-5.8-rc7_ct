@@ -3519,11 +3519,8 @@ static int parse_tc_nic_actions(struct mlx5e_priv *priv,
 			break;
 		case FLOW_ACTION_CT:
 			err = mlx5_tc_ct_parse_action(get_ct_priv(priv), attr, act, extack);
-			if (err) {
-				if (err == -EOPNOTSUPP)
-					netdev_warn(priv->netdev, "mlx5 tc ct offload isn't enabled.\n");
+			if (err)
 				return err;
-			}
 
 			flow_flag_set(flow, CT);
 			break;
@@ -4349,11 +4346,8 @@ static int parse_tc_fdb_actions(struct mlx5e_priv *priv,
 			break;
 		case FLOW_ACTION_CT:
 			err = mlx5_tc_ct_parse_action(get_ct_priv(priv), attr, act, extack);
-			if (err) {
-				if (err == -EOPNOTSUPP)
-					netdev_warn(priv->netdev, "mlx5 tc ct offload isn't enabled.\n");
+			if (err)
 				return err;
-			}
 
 			flow_flag_set(flow, CT);
 			break;
@@ -4623,11 +4617,8 @@ __mlx5e_add_fdb_flow(struct mlx5e_priv *priv,
 	/* actions validation depends on parsing the ct matches first */
 	err = mlx5_tc_ct_parse_match(get_ct_priv(priv), &parse_attr->spec, f,
 				     &flow->attr->ct_attr, extack);
-	if (err) {
-		if (err == -EOPNOTSUPP)
-			netdev_warn(priv->netdev, "mlx5 tc ct offload isn't enabled.\n");
+	if (err)
 		goto err_free;
-	}
 
 	err = parse_tc_fdb_actions(priv, &rule->action, flow, extack, filter_dev);
 	if (err)
@@ -4776,11 +4767,8 @@ mlx5e_add_nic_flow(struct mlx5e_priv *priv,
 
 	err = mlx5_tc_ct_parse_match(get_ct_priv(priv), &parse_attr->spec, f,
 				     &flow->attr->ct_attr, extack);
-	if (err) {
-		if (err == -EOPNOTSUPP)
-			netdev_warn(priv->netdev, "mlx5 tc ct offload isn't enabled.\n");
+	if (err)
 		goto err_free;
-	}
 
 	err = mlx5e_tc_add_nic_flow(priv, parse_attr, flow, extack);
 	if (err)
